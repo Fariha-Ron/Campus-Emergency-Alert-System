@@ -1,0 +1,82 @@
+/* ==========================================================
+   Campus Emergency Alert System - Frosted Glass & Anime Theme
+   Lush Cel-Shaded Open World (Genshin Impact / Anime Meadows)
+   ========================================================== */
+
+/* 1. Frosted Glass Main Centerpiece Hero Container */
+.glass-panel-anime {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  border-radius: 28px;
+  box-shadow: 
+    0 24px 60px -12px rgba(4, 120, 87, 0.22),
+    0 8px 24px -4px rgba(16, 185, 129, 0.14),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+}
+
+/* 2. Frosted Glass Top Status Badge */
+.glass-badge-anime {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 
+    0 4px 16px rgba(4, 120, 87, 0.10),
+    inset 0 1px 1px rgba(255, 255, 255, 1);
+}
+
+/* 3. Frosted Glass Category Cards (Medical, Fire, Security, Hazard) */
+.glass-card-anime {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 
+    0 8px 24px -4px rgba(4, 120, 87, 0.10),
+    0 2px 6px rgba(16, 185, 129, 0.06),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-anime:hover {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(16, 185, 129, 0.5);
+  transform: translateY(-6px);
+  box-shadow: 
+    0 20px 40px -8px rgba(4, 120, 87, 0.24),
+    0 0 24px rgba(16, 185, 129, 0.20),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
+}
+
+/* 4. Frosted Glass "Report an Emergency" CTA Button */
+.glass-btn-primary {
+  background: linear-gradient(135deg, #2E7D6B 0%, #1A6051 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 
+    0 12px 28px rgba(46, 125, 107, 0.35),
+    0 0 20px rgba(16, 185, 129, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.55);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-btn-primary:hover {
+  background: linear-gradient(135deg, #256A5B 0%, #134B3F 100%);
+  transform: translateY(-3px) scale(1.015);
+  box-shadow: 
+    0 18px 36px rgba(46, 125, 107, 0.45),
+    0 0 28px rgba(16, 185, 129, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.65);
+}
+
+.glass-btn-primary:active {
+  transform: translateY(-1px) scale(0.985);
+}
+
+/* High Contrast Title Glow for crisp readability over anime backdrop */
+.title-anime-glow {
+  text-shadow: 0 2px 14px rgba(255, 255, 255, 0.9), 0 0 30px rgba(209, 250, 229, 0.8);
+}

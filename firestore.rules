@@ -1,0 +1,228 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /reports/{reportId}
+    // Document ID: alphanumeric string with '_' and '-' (max 128 chars)
+    // Fields:
+    //   - type: string (required, ['Medical', 'Fire', 'Security', 'Hazard'])
+    //   - location: string (required, 1-200 chars)
+    //   - description: string (required, 1-2000 chars)
+    //   - status: string (required, ['NEW', 'ACKNOWLEDGED', 'RESOLVED'])
+    //   - submittedBy: string (required, UID or guest id, 1-128 chars, immutable on update)
+    //   - createdAt: timestamp or ISO string (required, immutable on update)
+    //   - photoUrl: string (optional, max 1000 chars)
+    //   - urgency: string (optional, ['Low', 'Medium', 'High', 'Critical'])
+    //   - submittedByEmail: string (optional, valid email, max 200 chars)
+    //   - submittedByName: string (optional, max 100 chars)
+    //   - adminNotes: string (optional, max 1000 chars, editable by admins)
+    //   - updatedAt: timestamp or ISO string (optional)
+    //
+    // Collection: /users/{userId}
+    // Document ID: Auth UID (max 128 chars)
+    // Fields:
+    //   - uid: string (required, matches Auth UID, immutable)
+    //   - email: string (required, valid email, max 200 chars)
+    //   - role: string (required, ['student', 'admin'], immutable by non-admins on update)
+    //   - displayName: string (optional, max 100 chars)
+    //   - phone: string (optional, max 25 chars)
+    //   - studentId: string (optional, max 50 chars)
+    //   - createdAt: timestamp or ISO string (optional, max 50 chars)
+    //
+    // Collection: /admins/{adminId}
+    // Document ID: Auth UID (max 128 chars)
+    // Fields:
+    //   - uid: string (required, matches Admin UID, immutable)
+    //   - email: string (required, valid email, max 200 chars)
+    //   - createdAt: timestamp or ISO string (optional, max 50 chars)
+    //
+    // ===============================================================
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.size() <= 200 &&
+        email.matches('^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // Admin verification: strictly recognizes designated email naofumiiwatanisan911@gmail.com, admins/{uid} document, or users/{uid} with role == 'admin'
+    function isAdmin() {
+      return isSignedIn() && (
+        (
+          'email' in request.auth.token &&
+          (
+            request.auth.token.email == 'naofumiiwatanisan911@gmail.com' ||
+            request.auth.token.email.lower() == 'naofumiiwatanisan911@gmail.com'
+          )
+        ) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
+    }
+
+    // ===============================================================
+    // Domain Validators (Applied to both create and update)
+    // ===============================================================
+
+    // Validation for Report entity
+    function isValidReport(data) {
+      return data.keys().hasAll(['type', 'location', 'description', 'status', 'submittedBy', 'createdAt'])
+        && data.keys().hasOnly([
+          'type', 'location', 'description', 'status', 'submittedBy', 'createdAt',
+          'photoUrl', 'urgency', 'submittedByEmail', 'submittedByName', 'adminNotes', 'updatedAt'
+        ])
+        && data.type in ['Medical', 'Fire', 'Security', 'Hazard']
+        && data.location is string && data.location.size() > 0 && data.location.size() <= 200
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 2000
+        && data.status in ['NEW', 'ACKNOWLEDGED', 'RESOLVED']
+        && data.submittedBy is string && data.submittedBy.size() > 0 && data.submittedBy.size() <= 128
+        && (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 1000))
+        && (!('urgency' in data) || (data.urgency in ['Low', 'Medium', 'High', 'Critical']))
+        && (!('submittedByEmail' in data) || (data.submittedByEmail is string && isValidEmail(data.submittedByEmail) && data.submittedByEmail.size() <= 200))
+        && (!('submittedByName' in data) || (data.submittedByName is string && data.submittedByName.size() <= 100))
+        && (!('adminNotes' in data) || (data.adminNotes is string && data.adminNotes.size() <= 1000))
+        && (!('updatedAt' in data) || data.updatedAt is timestamp || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
+    // Validation for UserProfile entity
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'phone', 'studentId', 'createdAt'])
+        && data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128
+        && data.email is string && isValidEmail(data.email) && data.email.size() <= 200
+        && data.role in ['student', 'admin']
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 25))
+        && (!('studentId' in data) || (data.studentId is string && data.studentId.size() <= 50))
+        && (!('createdAt' in data) || data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 50));
+    }
+
+    // Validation for AdminRecord entity
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt'])
+        && data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128
+        && data.email is string && isValidEmail(data.email) && data.email.size() <= 200
+        && (!('createdAt' in data) || data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 50));
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Reports collection
+    match /reports/{reportId} {
+      allow get: if isSignedIn() && isValidId(reportId) && (
+        isAdmin() || resource.data.submittedBy == request.auth.uid
+      );
+
+      allow list: if isSignedIn() && (
+        isAdmin() || resource.data.submittedBy == request.auth.uid
+      );
+
+      allow create: if isSignedIn()
+        && isValidId(reportId)
+        && isValidReport(incoming())
+        && incoming().status == 'NEW'
+        && (incoming().createdAt == request.time || incoming().createdAt is timestamp || (incoming().createdAt is string && incoming().createdAt.size() <= 50))
+        && (!('adminNotes' in incoming()) || isAdmin())
+        && (isAdmin() || incoming().submittedBy == request.auth.uid);
+
+      allow update: if isSignedIn()
+        && isValidId(reportId)
+        && (
+          (
+            isAdmin() &&
+            incoming().status in ['NEW', 'ACKNOWLEDGED', 'RESOLVED']
+          ) ||
+          (
+            isValidReport(incoming()) &&
+            incoming().submittedBy == existing().submittedBy &&
+            incoming().createdAt == existing().createdAt &&
+            existing().submittedBy == request.auth.uid &&
+            existing().status != 'RESOLVED' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['description', 'location', 'urgency', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(reportId);
+    }
+
+    // Users collection (PII isolation)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (
+        request.auth.uid == userId || isAdmin()
+      );
+
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && incoming().uid == request.auth.uid
+        && isValidUser(incoming())
+        && (
+          incoming().role == 'student' ||
+          isAdmin() ||
+          ('email' in request.auth.token && request.auth.token.email == 'naofumiiwatanisan911@gmail.com')
+        );
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && (isAdmin() || (request.auth.uid == userId && incoming().role == existing().role));
+
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Admins registry collection
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId);
+      allow list: if isAdmin();
+      allow create: if isValidId(adminId)
+        && isValidAdminRecord(incoming())
+        && (
+          isAdmin() ||
+          ('email' in request.auth.token && request.auth.token.email == 'naofumiiwatanisan911@gmail.com')
+        );
+      allow update: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdminRecord(incoming())
+        && incoming().uid == existing().uid;
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+  }
+}
